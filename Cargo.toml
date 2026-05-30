@@ -1,0 +1,60 @@
+[workspace]
+members = ["src-tauri"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["MindRush Team"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# UUID
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# DateTime
+chrono = { version = "0.4", features = ["serde"] }
+
+# Hash
+sha2 = "0.10"
+hex = "0.4"
+
+# Regex
+regex = "1.10"
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json"] }
+
+# Directories
+directories = "5.0"
+
+# EPUB
+rbook = "0.5"
+zip = "2.0"
+
+# Markdown
+pulldown-cmark = "0.12"
+
+# PDF processing
+pdf_oxide = { version = "0.3.55", features = ["system-fonts"] }
+
+# HTML rewriting
+lol_html = "2"
+
+[profile.dev]
+opt-level = 0

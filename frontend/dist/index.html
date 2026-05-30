@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindRush - AI Translation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --bg-elevated: #222230;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+            --accent-hover: #4f46e5;
+            --border-color: #2a2a3a;
+            --success: #10b981;
+            --error: #ef4444;
+            --shadow: 0 4px 20px rgba(0,0,0,0.4);
+            --transition: 0.3s ease;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-elevated: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --accent-primary: #4f46e5;
+            --accent-secondary: #7c3aed;
+            --accent-hover: #4338ca;
+            --border-color: #cbd5e1;
+            --shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background var(--transition), color var(--transition);
+        }
+        header {
+            background: var(--bg-secondary);
+            padding: 20px 40px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        h1 { font-size: 24px; font-weight: 700; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .header-btns { display: flex; gap: 12px; align-items: center; }
+        .header-btn {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all var(--transition);
+        }
+        .header-btn:hover { background: var(--accent-primary); color: white; border-color: var(--accent-primary); }
+        .header-btn.active { background: var(--accent-primary); color: white; border-color: var(--accent-primary); }
+        .theme-toggle {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-color);
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all var(--transition);
+        }
+        .theme-toggle:hover { background: var(--accent-primary); color: white; border-color: var(--accent-primary); transform: rotate(15deg); }
+        main { flex: 1; padding: 40px; display: flex; flex-direction: column; gap: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 28px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+            transition: all var(--transition);
+        }
+        .card:hover { border-color: var(--accent-primary); }
+        .card h2 { margin-bottom: 20px; color: var(--accent-primary); font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: var(--text-secondary); font-weight: 500; font-size: 14px; }
+        input, textarea, select {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all var(--transition);
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        textarea { min-height: 120px; resize: vertical; }
+        button {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            margin-right: 12px;
+            transition: all var(--transition);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: none; }
+        .btn-secondary:hover { background: var(--accent-primary); color: white; border-color: var(--accent-primary); }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .status { padding: 14px 20px; border-radius: 12px; margin-top: 16px; font-weight: 500; }
+        .status.info { background: var(--bg-elevated); color: var(--text-secondary); }
+        .status.error { background: rgba(239, 68, 68, 0.1); color: var(--error); }
+        .status.success { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 2px solid currentColor; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; margin-right: 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .debug { font-family: monospace; font-size: 12px; color: var(--text-muted); margin-top: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .side-panel { background: var(--bg-secondary); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); }
+        .side-panel h3 { color: var(--accent-primary); margin-bottom: 16px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .batch-progress { margin-top: 20px; }
+        .batch-progress-bar { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+        .batch-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)); transition: width 0.3s; }
+        .batch-progress-text { text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+        .hidden { display: none !important; }
+        .file-drop-zone { border: 2px dashed var(--border-color); border-radius: 16px; padding: 32px; text-align: center; cursor: pointer; transition: all var(--transition); background: var(--bg-secondary); margin-top: 16px; position: relative; overflow: hidden; }
+        .file-drop-zone:hover { border-color: var(--accent-primary); background: rgba(99, 102, 241, 0.05); }
+        .file-drop-zone-icon { font-size: 36px; margin-bottom: 12px; pointer-events: none; }
+        .file-drop-zone p { pointer-events: none; }
+        .file-drop-zone input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+        .file-drop-zone-icon { font-size: 36px; margin-bottom: 12px; pointer-events: none; }
+        .file-drop-zone p { pointer-events: none; }
+        .global-status {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+            padding: 16px 40px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+            z-index: 1000;
+        }
+        .global-status.visible { display: flex; align-items: center; gap: 12px; }
+        .global-status.error { color: var(--error); }
+        .global-status.success { color: var(--success); }
+        .config-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .config-full { grid-column: 1 / -1; }
+        .history-item { background: var(--bg-secondary); padding: 16px; border-radius: 12px; margin-bottom: 10px; cursor: pointer; border: 1px solid var(--border-color); transition: all var(--transition); }
+        .history-item:hover { border-color: var(--accent-primary); transform: translateX(4px); }
+        .history-item .original { color: var(--text-muted); font-size: 13px; margin-bottom: 6px; }
+        .history-item .translated { color: var(--text-primary); font-size: 14px; font-weight: 500; }
+        .history-item .meta { color: var(--text-muted); font-size: 11px; margin-top: 8px; display: flex; gap: 12px; }
+        @media (max-width: 900px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .config-grid { grid-template-columns: 1fr; }
+            main { padding: 20px; }
+            header { padding: 16px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <h1>MindRush</h1>
+        </div>
+        <div class="header-btns">
+            <button class="header-btn active" id="btnConfig">Config</button>
+            <button class="header-btn" id="btnTranslate">Translate</button>
+            <button class="header-btn" id="btnFile">File</button>
+            <button class="header-btn" id="btnHistory">History</button>
+            <button class="theme-toggle" id="themeToggle" title="Toggle theme">&#9788;</button>
+        </div>
+    </header>
+    <main>
+        <!-- Config Section -->
+        <div id="configSection" class="card">
+            <h2>&#9881; Configuration</h2>
+            <div class="llm-selector-bar">
+                <label>LLM:</label>
+                <select id="llmSelector"><option value="0">Default</option></select>
+                <button id="addLlmBtn">+ Add</button>
+                <button id="removeLlmBtn" class="btn-secondary">- Remove</button>
+            </div>
+            <div class="config-grid">
+                <div class="input-group">
+                    <label>Provider</label>
+                    <select id="provider">
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Model</label>
+                    <input type="text" id="model" placeholder="gpt-4o-mini" value="gpt-4o-mini">
+                </div>
+                <div class="input-group">
+                    <label>API Key</label>
+                    <input type="password" id="apiKey" placeholder="sk-...">
+                </div>
+                <div class="input-group">
+                    <label>Base URL (optional)</label>
+                    <input type="text" id="baseUrl" placeholder="https://api.openai.com">
+                </div>
+                <div class="input-group config-full">
+                    <label>System Prompt</label>
+                    <textarea id="systemPrompt" placeholder="Custom instructions for the translator...">You are a professional translator. Translate the following text accurately.</textarea>
+                </div>
+                <div class="input-group config-full">
+                    <label>Glossary (术语表)</label>
+                    <textarea id="glossary" placeholder="Aerith → 爱丽丝&#10;Midgar → 米德加" rows="6"></textarea>
+                </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 12px;">
+                <button id="updateConfig">Update Config</button>
+                <button id="saveConfig" class="btn-secondary">Save Config</button>
+                <button id="loadConfig" class="btn-secondary">Load Config</button>
+            </div>
+            <div id="configStatus" style="margin-top: 12px;"></div>
+        </div>
+
+        <!-- Translate Section -->
+        <div id="translateSection" class="card hidden">
+            <h2>&#128172; Translate</h2>
+            <div class="grid-2">
+                <div>
+                    <div class="input-group">
+                        <label>Source Language</label>
+                        <select id="sourceLang">
+                            <option value="zh">Chinese</option>
+                            <option value="ja">Japanese</option>
+                            <option value="en" selected>English</option>
+                            <option value="ko">Korean</option>
+                            <option value="auto">Auto-detect</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Target Language</label>
+                        <select id="targetLang">
+                            <option value="en">English</option>
+                            <option value="zh" selected>Chinese</option>
+                            <option value="ja">Japanese</option>
+                            <option value="ko">Korean</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Text to translate (supports multiple lines)</label>
+                        <textarea id="inputText" placeholder="Enter text to translate..."></textarea>
+                    </div>
+                    <button id="translateBtn">Translate</button>
+                </div>
+                <div class="side-panel">
+                    <h3>Translation Result</h3>
+                    <div id="result" class="result" style="display:none;"></div>
+                    <div id="status"></div>
+                </div>
+            </div>
+            <div id="debug" class="debug"></div>
+        </div>
+
+        <!-- File Section -->
+        <div id="fileSection" class="card hidden">
+            <h2>&#128196; File Translation</h2>
+            <div class="grid-2">
+                <div>
+                    <div class="input-group">
+                        <label>Source Language</label>
+                        <select id="fileSourceLang">
+                            <option value="en" selected>English</option>
+                            <option value="zh">Chinese</option>
+                            <option value="ja">Japanese</option>
+                            <option value="ko">Korean</option>
+                            <option value="auto">Auto-detect</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Target Language</label>
+                        <select id="fileTargetLang">
+                            <option value="zh" selected>Chinese</option>
+                            <option value="en">English</option>
+                            <option value="ja">Japanese</option>
+                            <option value="ko">Korean</option>
+                        </select>
+                    </div>
+                    <div class="file-drop-zone" id="fileDropZone">
+                        <input type="file" id="fileInput" accept=".txt,.srt,.ass,.vtt,.json,.epub,.md,.pdf">
+                        <div class="file-drop-zone-icon">&#128196;</div>
+                        <p style="color: var(--text-secondary);">Click to select file or drag & drop here</p>
+                        <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">Supports: .txt, .srt, .ass, .vtt, .json, .epub, .md, .pdf</p>
+                    </div>
+                    <div id="fileInfo" style="margin-top: 12px; color: var(--text-muted); font-size: 13px;"></div>
+                    <input type="hidden" id="filePathInput" value="">
+                    <div style="margin-top: 16px; display: flex; gap: 12px;">
+                        <button id="translateFileBtn" class="btn-secondary" disabled>Translate File</button>
+                        <button id="exportFileBtn" class="btn-secondary" disabled>Export Translated</button>
+                    </div>
+                    <div id="epubProgress" class="hidden" style="margin-top:10px; margin-bottom:10px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span id="epubProgressText" style="font-size:13px;color:#666;">Translating...</span>
+                            <span id="epubProgressPercent" style="font-size:13px;color:#666;">0%</span>
+                        </div>
+                        <div style="background:#e5e7eb;border-radius:4px;height:8px;overflow:hidden;">
+                            <div id="epubProgressBar" style="background:#4f46e5;height:100%;width:0%;transition:width 0.3s;border-radius:4px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="side-panel">
+                    <h3>File Content Preview</h3>
+                    <div id="filePreview" style="font-size: 13px; color: var(--text-secondary); white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            <div id="fileProgress" class="batch-progress hidden" style="margin-top: 20px;">
+                <div class="batch-progress-bar">
+                    <div id="fileProgressFill" class="batch-progress-fill" style="width: 0%;"></div>
+                </div>
+                <div id="fileProgressText" class="batch-progress-text">0 / 0</div>
+            </div>
+        </div>
+
+        <!-- History Section -->
+        <div id="historySection" class="card hidden">
+            <h2>&#128214; Translation History</h2>
+            <div style="margin-bottom: 16px; display: flex; gap: 12px;">
+                <button id="clearHistory" class="btn-secondary">Clear All History</button>
+                <button id="exportHistory" class="btn-secondary">Export History</button>
+            </div>
+            <div id="historyList" style="max-height: 500px; overflow-y: auto;"></div>
+        </div>
+    </main>
+
+    <div id="globalStatus" class="global-status"></div>
+
+    <script>
+        const { invoke } = window.__TAURI__.core;
+        const { listen } = window.__TAURI__.event;
+
+        // EPUB translation progress listener
+        let epubProgressListener = null;
+
+        async function setupEpubProgressListener() {
+            if (epubProgressListener) return;
+            epubProgressListener = await listen('epub-translation-progress', (e) => {
+            const { current_segment, total_segments, llm_attempts, llm_successes } = e.payload;
+            const pct = total_segments > 0 ? Math.round((current_segment / total_segments) * 100) : 0;
+
+            document.getElementById('epubProgressText').textContent = `Translating ${current_segment}/${total_segments} segments`;
+                document.getElementById('epubProgressBar').style.width = pct + '%';
+                if (llm_attempts !== undefined) {
+                    const failures = llm_attempts - llm_successes;
+                    document.getElementById('epubProgressPercent').textContent = pct + '% | API: ' + llm_attempts + ' calls, ' + failures + ' err';
+                } else {
+                    document.getElementById('epubProgressPercent').textContent = pct + '%';
+                }
+            });
+        }
+
+        // Populate LLM selector on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const configs = await invoke('list_llm_configs');
+                activeLlmIndex = configs.findIndex(c => c.is_active) ?? 0;
+                if (activeLlmIndex < 0) activeLlmIndex = 0;
+                await populateLlmSelector();
+                await loadActiveConfigForm();
+            } catch (e) { console.error('init LLM selector error:', e); }
+        });
+
+        // Theme management
+        const themeToggle = document.getElementById('themeToggle');
+        const savedTheme = localStorage.getItem('mindrush-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        themeToggle.innerHTML = savedTheme === 'dark' ? '&#9790;' : '&#9788;';
+
+        themeToggle.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('mindrush-theme', next);
+            themeToggle.innerHTML = next === 'dark' ? '&#9790;' : '&#9788;';
+        });
+
+        // Navigation buttons
+        const sections = ['configSection', 'translateSection', 'fileSection', 'historySection'];
+        const navButtons = ['btnConfig', 'btnTranslate', 'btnFile', 'btnHistory'];
+
+        navButtons.forEach((btnId, idx) => {
+            document.getElementById(btnId).addEventListener('click', () => {
+                // Update button states
+                navButtons.forEach(id => document.getElementById(id).classList.remove('active'));
+                document.getElementById(btnId).classList.add('active');
+                // Show/hide sections
+                sections.forEach((secId, secIdx) => {
+                    if (secIdx === idx) {
+                        document.getElementById(secId).classList.remove('hidden');
+                    } else {
+                        document.getElementById(secId).classList.add('hidden');
+                    }
+                });
+                // Load history if needed
+                if (btnId === 'btnHistory') loadHistory();
+            });
+        });
+
+        // Config save/load
+        document.getElementById('updateConfig').addEventListener('click', updateConfig);
+        document.getElementById('saveConfig').addEventListener('click', async () => {
+            try {
+                await invoke('save_config');
+                showGlobalStatus('Config saved to %APPDATA%\\MindRush\\config\\mindrush_config.json', 'success');
+            } catch (e) { showGlobalStatus('Save error: ' + e, 'error'); }
+        });
+        document.getElementById('loadConfig').addEventListener('click', async () => {
+            try {
+                const config = await invoke('load_config');
+                if (config) {
+                    // Restore state from file and repopulate selector
+                    if (config.llm_configs) {
+                        activeLlmIndex = config.active_llm_index || 0;
+                    }
+                    await populateLlmSelector();
+                    // Load form from memory (state was already restored by load_config)
+                    await loadActiveConfigForm();
+                    document.getElementById('systemPrompt').value = config.system_prompt || '';
+                    document.getElementById('glossary').value = await invoke('load_glossary') || '';
+                    showGlobalStatus('Config loaded', 'success');
+                }
+            } catch (e) { showGlobalStatus('Load error: ' + e, 'error'); }
+        });
+
+        // LLM Selector
+        let activeLlmIndex = 0;
+
+        async function populateLlmSelector() {
+            try {
+                const configs = await invoke('list_llm_configs');
+                const selector = document.getElementById('llmSelector');
+                selector.innerHTML = '';
+                configs.forEach((cfg, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.textContent = cfg.name || ('LLM ' + (idx + 1));
+                    selector.appendChild(opt);
+                });
+                selector.selectedIndex = activeLlmIndex;
+            } catch (e) { console.error('populateLlmSelector error:', e); }
+        }
+
+        document.getElementById('llmSelector').addEventListener('change', async () => {
+            activeLlmIndex = parseInt(document.getElementById('llmSelector').value);
+            try {
+                await invoke('set_active_llm', { index: activeLlmIndex });
+                await loadActiveConfigForm();
+            } catch (e) { console.error('set_active_llm error:', e); }
+        });
+
+        document.getElementById('addLlmBtn').addEventListener('click', async () => {
+            const name = prompt('Enter name for new LLM config:');
+            if (!name) return;
+            try {
+                await invoke('add_llm_config', { name, provider: 'openai', model: 'gpt-4o-mini', apiKey: '', baseUrl: null, temperature: 0.7, maxTokens: null });
+                await populateLlmSelector();
+                await invoke('save_config');
+                showGlobalStatus('LLM config added', 'success');
+            } catch (e) { showGlobalStatus('Add error: ' + e, 'error'); }
+        });
+
+        document.getElementById('removeLlmBtn').addEventListener('click', async () => {
+            const selector = document.getElementById('llmSelector');
+            if (selector.options.length <= 1) {
+                alert('Cannot remove the last LLM config.');
+                return;
+            }
+            if (!confirm('Remove this LLM config?')) return;
+            try {
+                await invoke('remove_llm_config', { index: parseInt(selector.value) });
+                activeLlmIndex = 0;
+                await populateLlmSelector();
+                await loadActiveConfigForm();
+                showGlobalStatus('LLM config removed', 'success');
+            } catch (e) { showGlobalStatus('Remove error: ' + e, 'error'); }
+        });
+
+        async function loadActiveConfigForm() {
+            try {
+                const config = await invoke('get_llm_config');
+                if (config) {
+                    document.getElementById('provider').value = (config.provider_type || 'openai').toLowerCase();
+                    document.getElementById('model').value = config.model || '';
+                    document.getElementById('apiKey').value = config.api_key || '';
+                    document.getElementById('baseUrl').value = config.base_url || '';
+                }
+            } catch (e) { console.error('loadActiveConfigForm error:', e); }
+        }
+
+        async function updateConfig() {
+            const provider = document.getElementById('provider').value;
+            const model = document.getElementById('model').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const baseUrl = document.getElementById('baseUrl').value || null;
+            const systemPrompt = document.getElementById('systemPrompt').value;
+            const statusEl = document.getElementById('configStatus');
+
+            statusEl.innerHTML = '<span class="loading"></span> Updating...';
+            statusEl.className = 'status info';
+            statusEl.style.display = 'block';
+
+            try {
+                await invoke('update_llm_config', { provider, model, apiKey, baseUrl, temperature: 0.7, maxTokens: null });
+                await invoke('update_system_prompt', { prompt: systemPrompt });
+                await invoke('save_glossary', { glossary: document.getElementById('glossary').value });
+                statusEl.textContent = 'Configuration updated successfully!';
+                statusEl.className = 'status success';
+            } catch (e) {
+                statusEl.textContent = 'Error: ' + e;
+                statusEl.className = 'status error';
+            }
+        }
+
+        function showGlobalStatus(message, type = 'info', duration = 5000) {
+            const el = document.getElementById('globalStatus');
+            el.textContent = message;
+            el.className = 'global-status visible ' + type;
+            if (duration > 0) {
+                setTimeout(() => el.classList.remove('visible'), duration);
+            }
+        }
+
+        // Translate
+        document.getElementById('translateBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('translateBtn');
+            const status = document.getElementById('status');
+            const result = document.getElementById('result');
+            const debug = document.getElementById('debug');
+
+            btn.disabled = true;
+            status.innerHTML = '<span class="loading"></span> Translating...';
+            status.className = 'status info';
+            result.style.display = 'none';
+            debug.textContent = '';
+
+            try {
+                const text = document.getElementById('inputText').value;
+                const sourceLang = document.getElementById('sourceLang').value;
+                const targetLang = document.getElementById('targetLang').value;
+
+                debug.textContent = `Sending: source=${sourceLang}, target=${targetLang}, text="${text}"`;
+                const res = await invoke('translate_text', { text, sourceLang, targetLang });
+
+                debug.textContent += `\nResponse received: ${JSON.stringify(res)}`;
+
+                let translatedText = res.translated_text || '(empty response)';
+                translatedText = translatedText.replace(/\n\n---\n/g, '\n').replace(/\n\n/g, '\n').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+                result.textContent = translatedText;
+                result.style.display = 'block';
+                status.textContent = 'Translation complete! (Tokens: ' + (res.prompt_tokens + res.completion_tokens) + ')';
+                status.className = 'status info';
+
+                await invoke('add_history', { original: text, translated: translatedText, sourceLang, targetLang, tokens: res.prompt_tokens + res.completion_tokens });
+            } catch (e) {
+                status.innerHTML = 'Error: ' + e;
+                status.className = 'status error';
+                debug.textContent = 'Full error: ' + e;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // File translation
+        let currentFileContent = '';
+        let currentFileLines = [];
+        let translatedLines = [];
+        let originalFileName = '';
+        let originalFilePath = '';
+
+        // File input change (click to select)
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFileObject(file);
+        });
+
+// Drag and drop - using Tauri events
+        // Note: Tauri drag events fire at window level, not element level
+        // So we just handle the drop - the user chose to drop in our window
+        const dropZone = document.getElementById('fileDropZone');
+
+        listen('tauri://drag-drop', async (e) => {
+            // User dropped a file in our window - load it
+            const paths = e.payload.paths;
+            if (paths && paths.length > 0) {
+                const isEpub = paths[0].toLowerCase().endsWith('.epub');
+                const isMd = paths[0].toLowerCase().endsWith('.md');
+                const isPdf = paths[0].toLowerCase().endsWith('.pdf');
+                if (isEpub || isMd || isPdf) {
+                    const readCmd = isMd ? 'read_md' : isPdf ? 'read_pdf' : 'read_epub';
+                    const label = isMd ? 'MD' : isPdf ? 'PDF' : 'EPUB';
+                    await setupEpubProgressListener();
+                    invoke(readCmd, { path: paths[0] }).then((info) => {
+                        // info is {filename: "...", segment_count: 234}
+                        currentFileContent = "";
+                        document.getElementById('fileInfo').textContent = info.filename + ' (' + info.segment_count + ' segments)';
+                        document.getElementById('filePreview').textContent = '[' + label + ' loaded - ' + info.segment_count + ' segments ready for translation]';
+                        originalFileName = info.filename;
+                        originalFilePath = paths[0];
+                        document.getElementById('translateFileBtn').disabled = false;
+                        currentFileLines = [];
+                        translatedLines = [];
+                        showGlobalStatus(label + ' loaded: ' + info.segment_count + ' segments', 'success');
+                    }).catch((e) => {
+                        showGlobalStatus('Failed to load ' + label + ': ' + e, 'error');
+                    });
+                } else {
+                    invoke('read_file', { path: paths[0] }).then((content) => {
+                        currentFileContent = content;
+                        document.getElementById('filePreview').textContent = content.substring(0, 2000) + (content.length > 2000 ? '\n...' : '');
+                        document.getElementById('fileInfo').textContent = paths[0] + ' (' + content.length + ' chars)';
+                        originalFileName = paths[0].replace(/^.*[\\\/]/, '');
+                        originalFilePath = paths[0];
+                        document.getElementById('translateFileBtn').disabled = false;
+                        currentFileLines = content.split('\n');
+                        showGlobalStatus('File loaded successfully', 'success');
+                    }).catch((e) => {
+                        showGlobalStatus('Failed to load file: ' + e, 'error');
+                    });
+                }
+            }
+        });
+
+        listen('tauri://drag-enter', (e) => {
+            console.log('tauri drag-enter');
+            updateDropZoneBounds();
+            dropZone.style.borderColor = 'var(--accent-primary)';
+            dropZone.style.background = 'rgba(99, 102, 241, 0.1)';
+        });
+
+        listen('tauri://drag-leave', (e) => {
+            console.log('tauri drag-leave');
+            dropZone.style.borderColor = '';
+            dropZone.style.background = '';
+            dropZoneBounds = null;
+        });
+
+        listen('tauri://drag-drop', (e) => {
+            console.log('tauri drag-drop');
+            dropZone.style.borderColor = '';
+            dropZone.style.background = '';
+
+            const paths = e.payload.paths;
+            if (paths && paths.length > 0) {
+            const isEpub = paths[0].toLowerCase().endsWith('.epub');
+            const isMd = paths[0].toLowerCase().endsWith('.md');
+            const isPdf = paths[0].toLowerCase().endsWith('.pdf');
+            if (isEpub || isMd || isPdf) {
+                const readCmd = isMd ? 'read_md' : isPdf ? 'read_pdf' : 'read_epub';
+                const label = isMd ? 'MD' : isPdf ? 'PDF' : 'EPUB';
+                invoke(readCmd, { path: paths[0] }).then((info) => {
+                        // info is {filename: "...", segment_count: 234}
+                        currentFileContent = "";
+                        document.getElementById('fileInfo').textContent = info.filename + ' (' + info.segment_count + ' segments)';
+                        document.getElementById('filePreview').textContent = '[' + label + ' loaded - ' + info.segment_count + ' segments ready for translation]';
+                        originalFileName = info.filename;
+                        originalFilePath = paths[0];
+                        document.getElementById('translateFileBtn').disabled = false;
+                        currentFileLines = [];
+                        translatedLines = [];
+                        showGlobalStatus(label + ' loaded: ' + info.segment_count + ' segments', 'success');
+                    }).catch((e) => {
+                        showGlobalStatus('Failed to load ' + label + ': ' + e, 'error');
+                    });
+                } else {
+                    invoke('read_file', { path: paths[0] }).then((content) => {
+                        currentFileContent = content;
+                        document.getElementById('filePreview').textContent = content.substring(0, 2000) + (content.length > 2000 ? '\n...' : '');
+                        document.getElementById('fileInfo').textContent = paths[0] + ' (' + content.length + ' chars)';
+                        originalFileName = paths[0].replace(/^.*[\\\/]/, '');
+                        originalFilePath = paths[0];
+                        document.getElementById('translateFileBtn').disabled = false;
+                        currentFileLines = content.split('\n');
+                        showGlobalStatus('File loaded successfully', 'success');
+                    }).catch((e) => {
+                        showGlobalStatus('Failed to load file: ' + e, 'error');
+                    });
+                }
+            }
+            dropZoneBounds = null;
+        });
+
+function handleFileObject(file) {
+            const isEpub = file.name.toLowerCase().endsWith('.epub');
+            const isMd = file.name.toLowerCase().endsWith('.md');
+            const isPdf = file.name.toLowerCase().endsWith('.pdf');
+            if (isEpub || isMd || isPdf) {
+                const readCmd = isMd ? 'read_md' : isPdf ? 'read_pdf' : 'read_epub';
+                const label = isMd ? 'MD' : isPdf ? 'PDF' : 'EPUB';
+                // For EPUB/MD files, use Tauri command (needs real filesystem path)
+                // Note: file input doesn't expose full path, so this relies on drag-drop having stored the path
+                const filepath = document.getElementById('filePathInput').value || file.name;
+                invoke(readCmd, { path: filepath }).then((info) => {
+                    // info is {filename: "...", segment_count: 234}
+                    currentFileContent = "";
+                    document.getElementById('fileInfo').textContent = info.filename + ' (' + info.segment_count + ' segments)';
+                    document.getElementById('filePreview').textContent = '[' + label + ' loaded - ' + info.segment_count + ' segments ready for translation]';
+                    originalFileName = info.filename;
+                    document.getElementById('translateFileBtn').disabled = false;
+                    currentFileLines = [];
+                    translatedLines = [];
+                }).catch((e) => {
+                    showGlobalStatus('Failed to load ' + label + ': ' + e + '. ' + label + ' files may need to be opened via drag-drop.', 'error');
+                });
+            } else {
+                const reader = new FileReader();
+                originalFileName = file.name;
+                reader.onload = (e) => {
+                    currentFileContent = e.target.result;
+                    document.getElementById('filePreview').textContent = currentFileContent.substring(0, 2000) + (currentFileContent.length > 2000 ? '\n...' : '');
+                    document.getElementById('fileInfo').textContent = file.name + ' (' + currentFileContent.length + ' chars)';
+                    document.getElementById('translateFileBtn').disabled = false;
+                    currentFileLines = currentFileContent.split('\n');
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Translate file
+        document.getElementById('translateFileBtn').addEventListener('click', async () => {
+            const sourceLang = document.getElementById('fileSourceLang').value;
+            const targetLang = document.getElementById('fileTargetLang').value;
+
+            // EPUB/MD files use backend batch translation
+            if (originalFileName.toLowerCase().endsWith('.epub') || originalFileName.toLowerCase().endsWith('.md') || originalFileName.toLowerCase().endsWith('.pdf')) {
+                document.getElementById('translateFileBtn').disabled = true;
+                document.getElementById('epubProgress').classList.remove('hidden');
+            document.getElementById('epubProgressText').textContent = 'Starting translation...';
+            document.getElementById('epubProgressBar').style.width = '0%';
+            document.getElementById('epubProgressPercent').textContent = '0%';
+                const translateCmd = originalFileName.toLowerCase().endsWith('.pdf') ? 'translate_pdf' : 'translate_epub';
+                invoke(translateCmd, { sourceLang: sourceLang, targetLang: targetLang }).then(() => {
+                    document.getElementById('exportFileBtn').disabled = false;
+                    // Show completion state instead of hiding
+                    document.getElementById('epubProgressBar').style.width = '100%';
+                    document.getElementById('epubProgressBar').style.background = '#22c55e'; // green
+                    document.getElementById('epubProgressText').textContent = 'Translation complete!';
+                    // Keep the percent text showing final API stats from last progress event
+                    showGlobalStatus('Translation complete!', 'success');
+                }).catch((e) => {
+                    document.getElementById('translateFileBtn').disabled = false;
+                    // Show error stats instead of hiding
+                    document.getElementById('epubProgressBar').style.background = '#ef4444'; // red
+                    document.getElementById('epubProgressText').textContent = 'Translation incomplete: ' + e;
+                    showGlobalStatus('Translation error: ' + e, 'error');
+                });
+                return;
+            }
+
+            if (currentFileLines.length === 0) return;
+
+            translatedLines = new Array(currentFileLines.length).fill(null);
+            const progress = document.getElementById('fileProgress');
+            const progressFill = document.getElementById('fileProgressFill');
+            const progressText = document.getElementById('fileProgressText');
+
+            progress.classList.remove('hidden');
+            document.getElementById('translateFileBtn').disabled = true;
+            document.getElementById('exportFileBtn').disabled = true;
+
+            const TARGET_TOKENS = 2000;
+
+            function estimateTokens(text) {
+                // Heuristic: Chinese chars ≈ 1.5 tokens, English words ≈ 1.3 tokens
+                const cjkChars = (text.match(/[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g) || []).length;
+                const otherText = text.replace(/[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g, '');
+                const words = otherText.split(/\s+/).filter(w => w.length > 0).length;
+                return Math.ceil(cjkChars * 1.5 + words * 1.3);
+            }
+
+            function chunkByTokens(lines) {
+                const chunks = [];
+                let currentChunk = [];
+                let currentTokens = 0;
+                let chunkStartIdx = 0;
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const lineTokens = estimateTokens(line);
+                    if (currentTokens + lineTokens > TARGET_TOKENS && currentChunk.length > 0) {
+                        chunks.push({ lines: currentChunk, startIdx: chunkStartIdx });
+                        currentChunk = [];
+                        currentTokens = 0;
+                        chunkStartIdx = i;
+                    }
+                    currentChunk.push(line);
+                    currentTokens += lineTokens;
+                }
+                if (currentChunk.length > 0) chunks.push({ lines: currentChunk, startIdx: chunkStartIdx });
+                return chunks;
+            }
+
+            let accumulatedPrev = '';
+            const chunks = chunkByTokens(currentFileLines);
+
+            // Pre-scan: translate first chunk with null context to establish document profile
+            const firstNonEmptyLines = chunks[0].lines.filter(l => l.trim() !== '');
+            let documentProfile = null;
+            if (firstNonEmptyLines.length > 0) {
+                const firstText = firstNonEmptyLines.join('\n');
+                try {
+                    const preRes = await invoke('translate_text', {
+                        text: firstText,
+                        sourceLang,
+                        targetLang,
+                        previousText: null
+                    });
+                    documentProfile = preRes.translated_text || firstText;
+                    documentProfile = documentProfile.replace(/\n\n---\n/g, '\n').replace(/\n\n/g, '\n').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+                } catch (e) {
+                    documentProfile = null;
+                }
+            }
+
+            // Map pre-scan result back to translatedLines for first chunk
+            const firstChunk = chunks[0];
+            if (documentProfile && firstNonEmptyLines.length > 0) {
+                const firstCleanedParts = documentProfile.split('\n');
+                let firstPartIdx = 0;
+                for (let i = firstChunk.startIdx; i < firstChunk.startIdx + firstChunk.lines.length; i++) {
+                    if (currentFileLines[i].trim() === '') {
+                        translatedLines[i] = currentFileLines[i];
+                    } else {
+                        translatedLines[i] = firstCleanedParts[firstPartIdx] || currentFileLines[i];
+                        firstPartIdx++;
+                    }
+                }
+                accumulatedPrev = documentProfile;
+                try {
+                    await invoke('add_history', { original: firstNonEmptyLines.join('\n'), translated: documentProfile, sourceLang, targetLang, tokens: 0 });
+                } catch (e) {}
+            } else {
+                // Fallback: keep original for first chunk
+                for (let i = firstChunk.startIdx; i < firstChunk.startIdx + firstChunk.lines.length; i++) {
+                    translatedLines[i] = currentFileLines[i];
+                }
+            }
+
+            for (let c = 1; c < chunks.length; c++) {
+                const chunk = chunks[c].lines;
+                const chunkStart = chunks[c].startIdx;
+                const chunkEnd = chunkStart + chunk.length;
+
+                // Filter out empty lines for translation but keep them in output
+                const nonEmptyLines = [];
+                chunk.forEach((line) => {
+                    if (line.trim() !== '') {
+                        nonEmptyLines.push(line);
+                    }
+                });
+
+                if (nonEmptyLines.length === 0) {
+                    // All empty lines - just add them
+                    for (let i = chunkStart; i < chunkEnd; i++) {
+                        translatedLines[i] = currentFileLines[i];
+                    }
+                    continue;
+                }
+
+                const textToTranslate = nonEmptyLines.join('\n');
+
+                try {
+                    const res = await invoke('translate_text', {
+                        text: textToTranslate,
+                        sourceLang,
+                        targetLang,
+                        previousText: accumulatedPrev || null
+                    });
+                    let translatedText = res.translated_text || textToTranslate;
+                    translatedText = translatedText.replace(/\n\n---\n/g, '\n').replace(/\n\n/g, '\n').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+                    const translatedParts = translatedText.split('\n');
+
+                    // Map back to original positions
+                    let partIdx = 0;
+                    for (let i = chunkStart; i < chunkEnd; i++) {
+                        if (currentFileLines[i].trim() === '') {
+                            translatedLines[i] = currentFileLines[i];
+                        } else {
+                            translatedLines[i] = translatedParts[partIdx] || currentFileLines[i];
+                            partIdx++;
+                        }
+                    }
+
+                    accumulatedPrev = accumulatedPrev ? accumulatedPrev + '\n\n' + translatedText : translatedText;
+
+                    await invoke('add_history', { original: textToTranslate, translated: translatedText, sourceLang, targetLang, tokens: res.prompt_tokens + res.completion_tokens });
+                } catch (e) {
+                    // On error, keep original for this chunk
+                    for (let i = chunkStart; i < chunkEnd; i++) {
+                        translatedLines[i] = currentFileLines[i];
+                    }
+                }
+
+                // Progress update
+                progressFill.style.width = ((c + 1) / chunks.length * 100) + '%';
+                progressText.textContent = (c + 1) + ' / ' + chunks.length;
+
+                await new Promise(r => setTimeout(r, 50));
+            }
+
+            document.getElementById('filePreview').textContent = translatedLines.join('\n').substring(0, 2000) + (translatedLines.join('\n').length > 2000 ? '\n...' : '');
+            document.getElementById('translateFileBtn').disabled = false;
+            document.getElementById('exportFileBtn').disabled = false;
+            showGlobalStatus('File translation complete!', 'success');
+        });
+
+        // Export file
+        document.getElementById('exportFileBtn').addEventListener('click', async () => {
+            const isEpub = originalFileName.toLowerCase().endsWith('.epub');
+            const isMd = originalFileName.toLowerCase().endsWith('.md');
+            const isPdf = originalFileName.toLowerCase().endsWith('.pdf');
+            if (isEpub || isMd || isPdf) {
+                const exportCmd = isMd ? 'export_md' : isPdf ? 'export_pdf' : 'export_epub';
+                // Uses backend export with no parameters
+                try {
+                    const filepath = await invoke(exportCmd);
+                    showGlobalStatus('File exported: ' + filepath, 'success');
+                } catch (e) {
+                    showGlobalStatus('Export error: ' + e, 'error');
+                }
+            } else {
+                if (translatedLines.length === 0) return;
+                try {
+                    const filepath = await invoke('export_file_results', { content: translatedLines.join('\n'), originalFilename: originalFileName });
+                    showGlobalStatus('File exported: ' + filepath, 'success');
+                } catch (e) {
+                    showGlobalStatus('Export error: ' + e, 'error');
+                }
+            }
+        });
+
+        // History
+        async function loadHistory() {
+            try {
+                const history = await invoke('get_history');
+                const list = document.getElementById('historyList');
+                list.innerHTML = '';
+
+                if (history.length === 0) {
+                    list.innerHTML = '<p style="color: var(--text-muted);">No translation history yet.</p>';
+                    return;
+                }
+
+                history.slice().reverse().forEach((item) => {
+                    const div = document.createElement('div');
+                    div.className = 'history-item';
+                    div.innerHTML = '<div class="original">' + escapeHtml(item.original.substring(0, 80)) + '</div><div class="translated">' + escapeHtml(item.translated.substring(0, 80)) + '</div><div class="meta"><span>' + item.sourceLang + ' → ' + item.targetLang + '</span><span>' + item.tokens + ' tokens</span><span>' + item.timestamp + '</span></div>';
+                    div.addEventListener('click', () => {
+                        document.getElementById('inputText').value = item.original;
+                        document.getElementById('sourceLang').value = item.sourceLang;
+                        document.getElementById('targetLang').value = item.targetLang;
+                        document.getElementById('btnTranslate').click();
+                    });
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error('History load error:', e); }
+        }
+
+        document.getElementById('clearHistory').addEventListener('click', async () => {
+            try { await invoke('clear_history'); loadHistory(); } catch (e) { console.error(e); }
+        });
+
+        document.getElementById('exportHistory').addEventListener('click', async () => {
+            try { await invoke('export_history'); } catch (e) { console.error(e); }
+        });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        (async () => {
+            try {
+                const config = await invoke('load_config');
+                if (config && config.model) {
+                    document.getElementById('provider').value = config.provider || 'openai';
+                    document.getElementById('model').value = config.model || '';
+                    document.getElementById('apiKey').value = config.api_key || '';
+                    document.getElementById('baseUrl').value = config.base_url || '';
+                    document.getElementById('systemPrompt').value = config.system_prompt || '';
+                }
+            } catch (e) { console.log('No saved config found'); }
+        })();
+    </script>
+</body>
+</html>

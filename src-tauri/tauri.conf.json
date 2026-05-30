@@ -1,0 +1,23 @@
+{
+  "$schema": "https://v2.tauri.app/schemas/Config/v2",
+  "productName": "MindRush",
+  "identifier": "com.mindrush.app",
+  "version": "0.1.0",
+  "build": {
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "MindRush - AI Translation",
+        "width": 1200,
+        "height": 800,
+        "center": true
+      }
+    ]
+  },
+  "bundle": {
+    "icon": ["../frontend/dist/favicon.ico"]
+  }
+}

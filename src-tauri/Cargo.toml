@@ -1,0 +1,85 @@
+﻿[package]
+name = "mindrush"
+version.workspace = true
+edition.workspace = true
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# UUID
+uuid = { workspace = true }
+
+# DateTime
+chrono = { workspace = true }
+
+# Hash
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+# Regex
+regex = { workspace = true }
+
+# HTTP client
+reqwest = { workspace = true }
+
+# Directories
+directories = { workspace = true }
+
+# EPUB
+rbook = { workspace = true }
+zip = { workspace = true }
+
+# Markdown
+pulldown-cmark = { workspace = true }
+pdf_oxide = { workspace = true }
+
+# HTML rewriting
+lol_html = { workspace = true }
+
+# Tauri (for desktop builds)
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+
+[[bin]]
+name = "mindrush"
+path = "src/main.rs"
+
+[[bin]]
+name = "epub_test"
+path = "src/bin/epub_test.rs"
+
+[[bin]]
+name = "epub_export_test"
+path = "src/bin/epub_export_test.rs"
+
+[[bin]]
+name = "epub_batch_verify"
+path = "src/bin/epub_batch_verify.rs"
+
+[[bin]]
+name = "md_test"
+path = "src/bin/md_test.rs"
+
+[[bin]]
+name = "pdf_test"
+path = "src/bin/pdf_test.rs"
+
+
+
