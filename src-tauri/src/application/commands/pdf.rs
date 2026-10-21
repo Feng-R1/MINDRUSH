@@ -383,10 +383,10 @@ pub async fn translate_pdf(
     target_lang: String,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let segments = {
+    let (segments, existing_translations) = {
         let doc = state.pdf_document.read().await;
         let doc = doc.as_ref().ok_or("No PDF loaded.")?;
-        doc.translatable_segments.clone()
+        (doc.translatable_segments.clone(), doc.translations.clone())
     };
 
     {
@@ -395,7 +395,7 @@ pub async fn translate_pdf(
             original_path: String::new(),
             filename: String::new(),
             segments: segments.clone(),
-            translations: vec![None; segments.len()],
+            translations: existing_translations,
             marked_sections: vec![MarkedSection {
                 spine_path: "root".to_string(),
                 marked_xhtml: String::new(),
@@ -414,9 +414,9 @@ pub async fn translate_pdf(
         });
     }
 
-    crate::application::commands::epub::translate_epub(
+    let result = crate::application::commands::epub::translate_epub(
         state.clone(), source_lang, target_lang, app_handle
-    ).await?;
+    ).await;
 
     {
         let epub = state.epub_document.read().await;
@@ -427,7 +427,7 @@ pub async fn translate_pdf(
         }
     }
 
-    Ok(())
+    result
 }
 
 // -- Helpers --

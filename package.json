@@ -1,0 +1,15 @@
+{
+  "name": "mindrush",
+  "private": true,
+  "version": "0.2.0",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "desktop:dev": "node frontend/node_modules/@tauri-apps/cli/tauri.js dev",
+    "desktop:build": "node frontend/node_modules/@tauri-apps/cli/tauri.js build",
+    "check:version": "node scripts/check-version.mjs"
+  }
+}

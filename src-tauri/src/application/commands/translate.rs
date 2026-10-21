@@ -3,7 +3,7 @@
 use crate::application::state::AppState;
 use crate::domain::entity::{CacheItem, Language};
 use crate::domain::value_object::TranslationResult;
-use crate::infrastructure::llm::{LLMProviderFactory, with_retry, Message, MessageRole};
+use crate::infrastructure::llm::{LLMConfig, LLMProviderFactory, with_retry, Message, MessageRole};
 use tauri::{command, State};
 
 /// Cache statistics response
@@ -11,6 +11,31 @@ use tauri::{command, State};
 pub struct CacheStats {
     pub size: usize,
     pub hit_rate: f64,
+}
+
+fn translation_cache_key(
+    text: &str,
+    source_lang: &str,
+    target_lang: &str,
+    config: &LLMConfig,
+    system_prompt: &str,
+    glossary: &str,
+    previous_text: Option<&str>,
+) -> String {
+    CacheItem::compute_hash(&format!(
+        "{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}",
+        text,
+        source_lang,
+        target_lang,
+        config.provider_type as u8,
+        config.model,
+        config.base_url.as_deref().unwrap_or_default(),
+        config.temperature,
+        config.max_tokens.unwrap_or_default(),
+        system_prompt,
+        glossary,
+        previous_text.unwrap_or_default()
+    ))
 }
 
 /// Translate a single text
@@ -22,8 +47,33 @@ pub async fn translate_text(
     target_lang: String,
     previous_text: Option<String>,
 ) -> Result<TranslationResult, String> {
-    // Check cache first
-    let cache_key = CacheItem::compute_hash(&text);
+    if text.trim().is_empty() {
+        return Err("请输入需要翻译的文本".into());
+    }
+    // Cache by every setting that affects translation, so language, model and
+    // glossary changes cannot return a stale translation for the same text.
+    let active_index = *state.active_llm_index.read().await;
+    let llm_config = state
+        .llm_configs
+        .read()
+        .await
+        .get(active_index)
+        .map(|entry| entry.config.clone())
+        .ok_or_else(|| "No active LLM configuration found".to_string())?;
+    let system_prompt = state.system_prompt.read().await.clone();
+    let glossary = state.glossary.read().await.clone();
+    llm_config.validate().map_err(|error| error.to_string())?;
+    let source = Language::from_code(&source_lang).ok_or("Invalid source language")?;
+    let target = Language::from_code(&target_lang).ok_or("Invalid target language")?;
+    let cache_key = translation_cache_key(
+        &text,
+        source.to_ietf_tag(),
+        target.to_ietf_tag(),
+        &llm_config,
+        &system_prompt,
+        &glossary,
+        previous_text.as_deref(),
+    );
     {
         let cache = state.cache.read().await;
         if let Some(item) = cache.get(&cache_key) {
@@ -39,10 +89,6 @@ pub async fn translate_text(
             }
         }
     }
-
-    // Get language
-    let source = Language::from_code(&source_lang).ok_or("Invalid source language")?;
-    let target = Language::from_code(&target_lang).ok_or("Invalid target language")?;
 
     // Build messages
     let user_message = Message {
@@ -60,10 +106,6 @@ pub async fn translate_text(
     messages.push(user_message);
 
     // Get LLM provider and system prompt
-    let active_index = *state.active_llm_index.read().await;
-    let llm_config = state.llm_configs.read().await[active_index].config.clone();
-    let system_prompt = state.system_prompt.read().await.clone();
-    let glossary = state.glossary.read().await.clone();
     let effective_system_prompt = if glossary.trim().is_empty() {
         system_prompt.clone()
     } else {
@@ -92,6 +134,48 @@ pub async fn translate_text(
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::translation_cache_key;
+    use crate::infrastructure::llm::{LLMConfig, ProviderType};
+
+    fn config() -> LLMConfig {
+        LLMConfig {
+            provider_type: ProviderType::OpenAI,
+            model: "gpt-4o-mini".to_string(),
+            api_key: "test-key".to_string(),
+            base_url: None,
+            max_tokens: Some(4096),
+            temperature: 0.3,
+            timeout_secs: 120,
+        }
+    }
+
+    fn key(config: &LLMConfig, target: &str, glossary: &str) -> String {
+        translation_cache_key("hello", "en", target, config, "translator", glossary, None)
+    }
+
+    #[test]
+    fn cache_key_changes_when_translation_settings_change() {
+        let original = config();
+        let original_key = key(&original, "zh-Hans", "");
+
+        let mut changed_model = original.clone();
+        changed_model.model = "gpt-4.1".to_string();
+        let mut changed_provider = original.clone();
+        changed_provider.provider_type = ProviderType::Anthropic;
+        let mut changed_url = original.clone();
+        changed_url.base_url = Some("http://localhost:8080/v1".to_string());
+
+        assert_ne!(original_key, key(&original, "zh-Hant", ""));
+        assert_ne!(original_key, key(&changed_model, "zh-Hans", ""));
+        assert_ne!(original_key, key(&changed_provider, "zh-Hans", ""));
+        assert_ne!(original_key, key(&changed_url, "zh-Hans", ""));
+        assert_ne!(original_key, key(&original, "zh-Hans", "MindRush=MindRush"));
+        assert_eq!(original_key, key(&original, "zh-Hans", ""));
+    }
 }
 
 /// Get cache statistics

@@ -13,8 +13,69 @@ use tauri::{command, Emitter, State};
 
 use crate::application::state::{AppState, EpubDocument, EpubLoadInfo, MarkedSection, SegmentMeta, SegmentType};
 use crate::domain::entity::Language;
-use crate::infrastructure::llm::{LLMProviderFactory, with_retry, Message, MessageRole};
+use crate::infrastructure::llm::{LLMError, LLMProviderFactory, with_retry, Message, MessageRole};
 use lol_html::{element, end_tag, rewrite_str, text, RewriteStrSettings};
+
+/// Replace only text nodes, preserving inline markup, links, code and images.
+fn mark_xhtml(source: &str, first_index: usize) -> Result<(String, Vec<String>), String> {
+    #[derive(Default)]
+    struct SectionState {
+        translatable_depth: usize,
+        excluded_depth: usize,
+        segments: Vec<String>,
+    }
+    let state = Rc::new(RefCell::new(SectionState::default()));
+    let s_elements = state.clone();
+    let s_excluded = state.clone();
+    let s_text = state.clone();
+    let marked = rewrite_str(source, RewriteStrSettings {
+        element_content_handlers: vec![
+            element!("p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, figcaption, dt, dd, caption", move |element| {
+                if element.can_have_content() && !element.is_self_closing() {
+                    s_elements.borrow_mut().translatable_depth += 1;
+                    let s_end = s_elements.clone();
+                    element.on_end_tag(end_tag!(move |_| {
+                        let mut state = s_end.borrow_mut();
+                        state.translatable_depth = state.translatable_depth.saturating_sub(1);
+                        Ok(())
+                    }))?;
+                }
+                Ok(())
+            }),
+            element!("pre, code, script, style, svg, math", move |element| {
+                if element.can_have_content() && !element.is_self_closing() {
+                    s_excluded.borrow_mut().excluded_depth += 1;
+                    let s_end = s_excluded.clone();
+                    element.on_end_tag(end_tag!(move |_| {
+                        let mut state = s_end.borrow_mut();
+                        state.excluded_depth = state.excluded_depth.saturating_sub(1);
+                        Ok(())
+                    }))?;
+                }
+                Ok(())
+            }),
+            // A single root handler avoids processing text twice for nested p/li elements.
+            text!("html", move |chunk| {
+                let mut state = s_text.borrow_mut();
+                if state.translatable_depth == 0 || state.excluded_depth > 0 {
+                    return Ok(());
+                }
+                let raw = chunk.as_str();
+                let leading_len = raw.len() - raw.trim_start().len();
+                let trailing_start = raw.trim_end().len();
+                if leading_len >= trailing_start { return Ok(()); }
+                let decoded = html_escape::decode_html_entities(raw.trim()).into_owned();
+                let marker = format!("{}\x00EPUB_{}\x00{}", &raw[..leading_len], first_index + state.segments.len(), &raw[trailing_start..]);
+                state.segments.push(decoded);
+                chunk.replace(&marker, lol_html::html_content::ContentType::Text);
+                Ok(())
+            }),
+        ],
+        ..RewriteStrSettings::new()
+    }).map_err(|error| format!("HTML rewriting error: {}", error))?;
+    let segments = std::mem::take(&mut state.borrow_mut().segments);
+    Ok((marked, segments))
+}
 
 /// Read and parse an EPUB file.
 ///
@@ -39,142 +100,17 @@ pub async fn read_epub(
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "unknown.epub".to_string());
 
-        // CSS selector for translatable elements
-        let selector =
-            "p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, figcaption, dt, dd, caption";
-
         let reader = epub.reader();
-        let mut all_segments: Vec<String> = Vec::new();
-        let mut marked_sections: Vec<MarkedSection> = Vec::new();
-        let mut global_idx: usize = 0;
-
+        let mut all_segments = Vec::new();
+        let mut marked_sections = Vec::new();
         for data_result in reader.iter() {
-            let data = data_result.map_err(|e| format!("Failed to read section: {}", e))?;
-            let section_path = data
-                .get_content(ContentType::Path)
-                .unwrap_or("")
-                .to_string();
-            let original_html = data.as_lossy_str().to_string();
-
+            let data = data_result.map_err(|error| format!("Failed to read section: {}", error))?;
+            let section_path = data.get_content(ContentType::Path).unwrap_or("").to_string();
             let segment_start = all_segments.len();
-
-            /// Tracks per-section state for the lol_html rewrite pass.
-            struct SectionState {
-                code_block_depth: usize,
-                pending_text: String,
-                has_pending_element: bool,
-                segments: Vec<String>,
-                marker_idx: usize,
-            }
-
-            // Use lol_html for BOTH text extraction AND marker insertion in one pass.
-            // This ensures extraction and marking are always aligned — they come
-            // from the same DOM traversal, eliminating the misalignment bug from
-            // the regex-based approach.
-            let state = Rc::new(RefCell::new(SectionState {
-                code_block_depth: 0,
-                pending_text: String::new(),
-                has_pending_element: false,
-                segments: Vec::new(),
-                marker_idx: global_idx,
-            }));
-
-            let marked_xhtml = {
-                let s_track = state.clone();
-                let s_main = state.clone();
-                let s_text = state.clone();
-
-                rewrite_str(
-                    &original_html,
-                    RewriteStrSettings {
-                        element_content_handlers: vec![
-                            // Track nesting depth of <pre> and <code> blocks
-                            // so we can skip translatable elements inside them.
-                            element!("pre, code", move |el| {
-                                s_track.borrow_mut().code_block_depth += 1;
-                                let s = s_track.clone();
-                                el.on_end_tag(end_tag!(move |_end| {
-                                    s.borrow_mut().code_block_depth -= 1;
-                                    Ok(())
-                                }))
-                                .map_err(|_| "on_end_tag failed for pre/code")?;
-                                Ok(())
-                            }),
-                            // Main handler: clear content and register end-tag handler
-                            // for translatable elements (p, h1-h6, li, etc.)
-                            element!(selector, move |el| {
-                                let mut st = s_main.borrow_mut();
-
-                                // Skip elements inside code blocks
-                                if st.code_block_depth > 0 {
-                                    return Ok(());
-                                }
-
-                                // Clear the element's inner content (original text).
-                                // The marker will be inserted in the end-tag handler
-                                // if the accumulated text is non-empty.
-                                el.set_inner_content(
-                                    "",
-                                    lol_html::html_content::ContentType::Text,
-                                );
-
-                                // Mark that we have a pending element for the text handler
-                                st.has_pending_element = true;
-
-                                // Register end-tag handler: finalise accumulated text,
-                                // insert marker if non-empty.
-                                if el.can_have_content() {
-                                    let s = s_main.clone();
-                                    el.on_end_tag(end_tag!(move |end| {
-                                        let mut st = s.borrow_mut();
-                                        let text =
-                                            std::mem::take(&mut st.pending_text);
-                                        let trimmed = text.trim().to_string();
-
-                                        if !trimmed.is_empty() {
-                                            let marker =
-                                                format!("\x00EPUB_{}\x00", st.marker_idx);
-                                            st.marker_idx += 1;
-                                            st.segments.push(trimmed);
-                                            end.before(
-                                                &marker,
-                                                lol_html::html_content::ContentType::Text,
-                                            );
-                                        }
-
-                                        st.has_pending_element = false;
-                                        Ok(())
-                                    }))?;
-                                }
-
-                                Ok(())
-                            }),
-                            // Text handler: accumulate text for the current element
-                            text!(selector, move |t| {
-                                let mut st = s_text.borrow_mut();
-                                if st.has_pending_element {
-                                    st.pending_text.push_str(t.as_str());
-                                }
-                                Ok(())
-                            }),
-                        ],
-                        ..RewriteStrSettings::new()
-                    },
-                )
-                .map_err(|e| format!("HTML rewriting error: {}", e))?
-            };
-
-            let mut st = state.borrow_mut();
-            let segment_count = st.segments.len();
-            all_segments.extend(st.segments.drain(..));
-            global_idx = st.marker_idx;
-
-            marked_sections.push(MarkedSection {
-                spine_path: section_path,
-                marked_xhtml,
-                segment_start,
-                segment_count,
-            });
+            let (marked_xhtml, segments) = mark_xhtml(&data.as_lossy_str(), segment_start)?;
+            let segment_count = segments.len();
+            all_segments.extend(segments);
+            marked_sections.push(MarkedSection { spine_path: section_path, marked_xhtml, segment_start, segment_count });
         }
 
         let total_segments = all_segments.len();
@@ -208,30 +144,6 @@ pub async fn read_epub(
     Ok(load_info)
 }
 
-/// Emit a translation progress event to the frontend.
-///
-/// Sends the current batch and segment position to allow progress tracking
-/// in the UI without polling.
-fn emit_translation_progress(
-    app_handle: &tauri::AppHandle,
-    current_batch: usize,
-    total_batches: usize,
-    current_segment: usize,
-    total_segments: usize,
-) {
-    app_handle
-        .emit(
-            "epub-translation-progress",
-            serde_json::json!({
-                "current_batch": current_batch,
-                "total_batches": total_batches,
-                "current_segment": current_segment,
-                "total_segments": total_segments,
-            }),
-        )
-        .ok();
-}
-
 /// Translate all segments stored in AppState.epub_document.
 ///
 /// Reads segments from state, calls LLM for each, stores translations back.
@@ -257,7 +169,10 @@ pub async fn translate_epub(
 
     // Step 2: Set up LLM provider and prompts
     let active_index = *state.active_llm_index.read().await;
-    let llm_config = state.llm_configs.read().await[active_index].config.clone();
+    let llm_config = state.llm_configs.read().await.get(active_index)
+        .map(|entry| entry.config.clone())
+        .ok_or("未找到可用的模型配置，请打开模型设置")?;
+    llm_config.validate().map_err(|error| error.to_string())?;
     let system_prompt = state.system_prompt.read().await.clone();
     let glossary = state.glossary.read().await.clone();
     let effective_system_prompt = if glossary.trim().is_empty() {
@@ -289,6 +204,7 @@ pub async fn translate_epub(
     }
 
     if untranslated.is_empty() {
+        save_translations_incrementally(&state, &results).await?;
         return Ok(());
     }
 
@@ -350,7 +266,7 @@ pub async fn translate_epub(
                     &llm_config,
                 )
             },
-            1,
+            3,
             1000,
         ).await;
 
@@ -359,7 +275,12 @@ pub async fn translate_epub(
                 parse_batch_response(&resp.translated_text, batch.len())
                     .map_err(|e| format!("parse failed: {}", e))
             }
-            Err(e) => Err(format!("LLM failed: {}", e)),
+            Err(e) => {
+                if !matches!(e, LLMError::InvalidResponse(_) | LLMError::ParseResponseFailed(_)) {
+                    return Err(e.to_string());
+                }
+                Err(format!("LLM failed: {}", e))
+            },
         };
 
         let translations: Vec<String> = match translations_result {
@@ -379,7 +300,7 @@ pub async fn translate_epub(
                             &llm_config,
                         )
                     },
-                    1,
+                    3,
                     1000,
                 ).await;
 
@@ -400,7 +321,6 @@ pub async fn translate_epub(
                                         "error": "Failed to translate segment after retry"
                                     })).ok();
                                     failed_batches.push(global_idx);
-                                    processed_segments += 1;
                                     continue;
                                 }
                                 // Split in half
@@ -411,7 +331,10 @@ pub async fn translate_epub(
                             }
                         }
                     }
-                    Err(_) => {
+                    Err(e) => {
+                        if !matches!(e, LLMError::InvalidResponse(_) | LLMError::ParseResponseFailed(_)) {
+                            return Err(e.to_string());
+                        }
                         if batch.len() == 1 {
                             let (global_idx, _) = batch[0];
                             app_handle.emit("epub-translation-error", serde_json::json!({
@@ -419,7 +342,6 @@ pub async fn translate_epub(
                                 "error": "LLM failed for single segment after retry"
                             })).ok();
                             failed_batches.push(global_idx);
-                            processed_segments += 1;
                             continue;
                         }
                         let mid = start + (end - start) / 2;
@@ -443,7 +365,7 @@ pub async fn translate_epub(
     app_handle.emit("epub-translation-progress", serde_json::json!({
         "current_batch": 1,
         "total_batches": 1,
-        "current_segment": total_segments,
+        "current_segment": results.iter().filter(|translation| translation.is_some()).count(),
         "total_segments": total_segments,
         "llm_attempts": llm_attempts,
         "llm_successes": llm_successes,
@@ -453,7 +375,7 @@ pub async fn translate_epub(
         Ok(())
     } else {
         Err(format!(
-            "{} of {} segments translated. Failed segments: {:?}. Click 'Translate File' again to retry, or reduce BATCH_SIZE.",
+            "已翻译 {} / {} 个片段。失败片段：{:?}。点击重试文档翻译，可继续处理剩余片段。",
             results.iter().filter(|t| t.is_some()).count(),
             segments.len(),
             failed_batches,
@@ -536,7 +458,7 @@ pub async fn export_epub(state: State<'_, AppState>) -> Result<String, String> {
                 let idx = caps.get(1)
                     .and_then(|m| m.as_str().parse::<usize>().ok())
                     .unwrap_or(0);
-                translations.get(idx).cloned().flatten().unwrap_or_default()
+                html_escape::encode_text(&translations.get(idx).cloned().flatten().unwrap_or_default()).into_owned()
             });
             
             writer.start_file(&entry_name, file_options)
@@ -651,6 +573,24 @@ pub fn build_retry_prompt(original_prompt: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn inline_markup_images_code_and_nested_text_survive_extraction() {
+        let source = r#"<html><body><h1>Heading &amp; title</h1><p>Hello <strong>world</strong><code>keep_me()</code><img src="figure.png"/>!</p><ul><li><p>Nested item</p></li></ul></body></html>"#;
+        let (marked, segments) = super::mark_xhtml(source, 0).unwrap();
+        assert_eq!(segments, ["Heading & title", "Hello", "world", "!", "Nested item"]);
+        assert!(marked.contains("<strong>"));
+        assert!(marked.contains("<code>keep_me()</code>"));
+        assert!(marked.contains(r#"<img src="figure.png"/>"#));
+        assert_eq!(marked.matches("\x00EPUB_").count(), segments.len());
+    }
+
+    #[test]
+    fn adjacent_sections_use_unique_marker_indices() {
+        let (_, first) = super::mark_xhtml("<html><body><p>One</p></body></html>", 0).unwrap();
+        let (marked, _) = super::mark_xhtml("<html><body><p>Two</p></body></html>", first.len()).unwrap();
+        assert!(marked.contains("\x00EPUB_1\x00"));
+    }
+
     use super::*;
 
     #[test]

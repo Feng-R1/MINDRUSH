@@ -2,15 +2,20 @@
   "$schema": "https://v2.tauri.app/schemas/Config/v2",
   "productName": "MindRush",
   "identifier": "com.mindrush.app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "build": {
+    "beforeDevCommand": "npm --prefix frontend run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm --prefix frontend run build",
     "frontendDist": "../frontend/dist"
   },
   "app": {
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "MindRush - AI Translation",
+        "title": "MindRush · AI 文档翻译",
+        "minWidth": 720,
+        "minHeight": 600,
         "width": 1200,
         "height": 800,
         "center": true
@@ -18,6 +23,17 @@
     ]
   },
   "bundle": {
-    "icon": ["../frontend/dist/favicon.ico"]
+    "active": true,
+    "icon": ["icons/icon.ico"],
+    "targets": ["nsis", "msi"],
+    "shortDescription": "AI 文本与文档翻译",
+    "category": "Productivity",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": true
+      }
+    }
   }
 }

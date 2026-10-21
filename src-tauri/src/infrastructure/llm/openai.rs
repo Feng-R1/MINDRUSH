@@ -9,7 +9,6 @@ use std::pin::Pin;
 
 pub struct OpenAIProvider {
     client: Client,
-    config: LLMConfig,
 }
 
 impl OpenAIProvider {
@@ -19,7 +18,7 @@ impl OpenAIProvider {
             .build()
             .expect("Failed to create HTTP client");
 
-        Self { client, config }
+        Self { client }
     }
 }
 
@@ -40,6 +39,7 @@ impl LLMProvider for OpenAIProvider {
             .unwrap_or_else(|| "https://api.openai.com/v1/chat/completions".to_string());
 
         Box::pin(async move {
+            config.validate()?;
             // Build request body
             let mut body_messages = vec![Message {
                 role: MessageRole::System,
@@ -62,26 +62,30 @@ impl LLMProvider for OpenAIProvider {
             };
 
             // Send request
-            let response = client
+            let mut request = client
                 .post(&full_url)
-                .header("Authorization", format!("Bearer {}", config.api_key))
                 .header("Content-Type", "application/json")
-                .json(&request_body)
+                .json(&request_body);
+            if !config.api_key.trim().is_empty() {
+                request = request.bearer_auth(&config.api_key);
+            }
+            let response = request
                 .send()
                 .await
-                .map_err(|e| LLMError::RequestFailed(e.to_string()))?;
+                .map_err(|e| if e.is_timeout() {
+                    LLMError::Timeout("请求超时，请检查网络或稍后重试".into())
+                } else { LLMError::RequestFailed(e.without_url().to_string()) })?;
 
             // Check HTTP status
             let status = response.status();
-            if status.as_u16() == 401 {
+            if status.as_u16() == 401 || status.as_u16() == 403 {
                 return Err(LLMError::AuthFailed);
             }
             if status.as_u16() == 429 {
                 return Err(LLMError::RateLimited);
             }
             if !status.is_success() {
-                let body = response.text().await.unwrap_or_default();
-                return Err(LLMError::RequestFailed(format!("HTTP {}: {}", status, body)));
+                return Err(LLMError::RequestFailed(format!("HTTP {}，请检查模型名称、接口地址或服务状态", status)));
             }
 
             // Parse response
@@ -97,6 +101,12 @@ impl LLMProvider for OpenAIProvider {
             let content = choice.message.content.as_deref()
                 .unwrap_or("")
                 .to_string();
+            if content.trim().is_empty() {
+                return Err(LLMError::InvalidResponse("模型返回空译文，请检查所选模型或服务设置".into()));
+            }
+            if choice.finish_reason.as_deref() == Some("length") {
+                return Err(LLMError::InvalidResponse("模型输出超出长度限制，请缩短原文或增大输出上限".into()));
+            }
 
             Ok(TranslationResult {
                 translated_text: content,
@@ -126,8 +136,8 @@ struct OpenAIMessage<'a> {
 
 #[derive(Debug, Deserialize)]
 struct OpenAIResponse {
-    id: String,
     choices: Vec<OpenAIChoice>,
+    #[serde(default)]
     usage: OpenAIUsage,
 }
 
@@ -142,9 +152,10 @@ struct OpenAIMessageContent {
     content: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 struct OpenAIUsage {
+    #[serde(default)]
     prompt_tokens: u32,
+    #[serde(default)]
     completion_tokens: u32,
-    total_tokens: u32,
 }

@@ -45,6 +45,7 @@ pub async fn update_llm_config(
         temperature,
         timeout_secs: 120,
     };
+    config.validate().map_err(|error| error.to_string())?;
 
     let mut configs = state.llm_configs.write().await;
     let index = *state.active_llm_index.read().await;
@@ -93,6 +94,10 @@ pub async fn add_llm_config(
         temperature,
         timeout_secs: 120,
     };
+    config.validate().map_err(|error| error.to_string())?;
+    if name.trim().is_empty() {
+        return Err("请填写配置名称".into());
+    }
 
     let entry = LLMConfigEntry { name, config };
 
