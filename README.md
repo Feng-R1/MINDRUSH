@@ -12,12 +12,19 @@ MindRush 是一款开源桌面翻译应用。它支持文本及整本 EPUB、PDF
 
 ### Windows 安装包
 
-1. 打开 [Releases 下载页](https://github.com/Feng-R1/MINDRUSH/releases/latest)，下载 .exe 或 .msi 安装包。
+1. 打开 [Releases 下载页](https://github.com/Feng-R1/MINDRUSH/releases/latest)，推荐下载以 `-setup.exe` 结尾的 Windows x64 安装包。
 2. 安装并启动 MindRush。
 3. 打开「模型设置」，选择 OpenAI 兼容接口、Anthropic 或本地接口，填写模型名称及对应信息并保存。
 4. 粘贴文本并翻译。整书翻译可在应用中选择 EPUB、PDF 或 Markdown 文档。
 
-如果尚无已发布安装包，可在仓库的 Actions 页面运行 **Windows release** 工作流并下载构建产物，或从源码构建。
+| 下载文件 | 使用方式 |
+| --- | --- |
+| `*-setup.exe`（推荐） | 双击安装，从开始菜单打开；首次安装可能联网下载 WebView2 运行环境。 |
+| `*.msi` | 使用 Windows Installer 安装。 |
+| `*-windows-x64-portable.zip` | 解压后双击 `mindrush.exe`；需要电脑已安装 WebView2 Runtime。 |
+| `SHA256SUMS.txt` | 安装包与便携版的 SHA256 校验值。 |
+
+当前提供 Windows x64 版本，安装包尚未进行代码签名，Windows 可能显示未知发布者。请核对下载来源为本仓库。无需安装 Node.js 或 Rust 即可使用发布版。
 
 ### 从源码构建
 
@@ -56,7 +63,7 @@ MindRush 不内置模型，也不承担第三方模型费用。价格、数据�
 
 ## 发布版本
 
-维护者发布版本时，先同步更新根目录 package.json、frontend/package.json、Cargo.toml 和 src-tauri/tauri.conf.json 中的版本，再推送匹配的 tag：
+维护者发布版本时，先同步更新根目录 package.json、frontend/package.json、Cargo.toml 和 src-tauri/tauri.conf.json 中的版本及对应锁文件，并添加 `docs/release-vX.Y.Z.md` 中文发布说明，再推送匹配的 tag：
 
     git tag vX.Y.Z
     git push origin vX.Y.Z
