@@ -1,0 +1,30 @@
+name: CI
+on:
+  push:
+    branches: [main, 'codex/**', 'feature/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: '. -> target'
+      - name: Install locked frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Check matching versions
+        run: npm run check:version
+      - name: Build frontend
+        run: npm run build
+      - name: Run Rust tests
+        run: cargo test --workspace --all-targets --locked

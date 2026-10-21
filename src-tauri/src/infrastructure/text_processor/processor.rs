@@ -38,29 +38,36 @@ impl TextProcessor {
 
     /// Extract placeholders for safe processing
     fn extract_placeholders(&mut self, text: &str) -> String {
-        let mut result = text.to_string();
+        self.placeholder_store.clear();
         let mut counter = 0;
-
-        while let Some(m) = self.placeholder_pattern.find(&result) {
+        self.placeholder_pattern.replace_all(text, |caps: &regex::Captures| {
             let placeholder = format!("[placeholder:ph_{}]", counter);
-            self.placeholder_store.insert(placeholder.clone(), m.as_str().to_string());
-            result.replace_range(m.range(), &placeholder);
+            self.placeholder_store.insert(placeholder.clone(), caps[0].to_string());
             counter += 1;
-        }
-
-        result
+            placeholder
+        }).into_owned()
     }
 
     /// Restore placeholders to original values
     fn restore_placeholders(&mut self, text: &str) -> String {
-        let mut result = text.to_string();
-
-        for (placeholder, original) in &self.placeholder_store {
-            result = result.replace(placeholder, original);
-        }
-
+        let result = self.placeholder_pattern.replace_all(text, |caps: &regex::Captures| {
+            self.placeholder_store.get(&caps[0]).cloned().unwrap_or_else(|| caps[0].to_string())
+        }).into_owned();
         self.placeholder_store.clear();
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TextProcessor;
+
+    #[test]
+    fn placeholder_roundtrip_does_not_rescan_generated_placeholders() {
+        let mut processor = TextProcessor::new();
+        let original = "Hello [placeholder:user] and [placeholder:ph_0]";
+        let processed = processor.preprocess(original);
+        assert_eq!(processor.postprocess(&processed), original);
     }
 }
 

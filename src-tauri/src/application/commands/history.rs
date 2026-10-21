@@ -1,7 +1,7 @@
 // Application: History and File commands
 
 use crate::application::state::AppState;
-use crate::infrastructure::llm::LLMConfigEntry;
+use crate::infrastructure::llm::{LLMConfig, LLMConfigEntry};
 use tauri::{State, command};
 
 use serde::{Deserialize, Serialize};
@@ -34,6 +34,20 @@ pub struct ConfigFile {
     pub llm_configs: Vec<LLMConfigEntry>,
     #[serde(default)]
     pub active_llm_index: usize,
+}
+
+impl ConfigFile {
+    fn normalize(&mut self) {
+        if self.llm_configs.is_empty() {
+            self.llm_configs.push(LLMConfigEntry {
+                name: "Default".into(),
+                config: LLMConfig::default(),
+            });
+        }
+        if self.active_llm_index >= self.llm_configs.len() {
+            self.active_llm_index = 0;
+        }
+    }
 }
 
 /// Add a translation to history
@@ -204,6 +218,7 @@ pub async fn load_config(state: State<'_, AppState>) -> Result<Option<ConfigFile
     let content = fs::read_to_string(&filepath).map_err(|e| e.to_string())?;
 
     let mut config_file: ConfigFile = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    config_file.normalize();
 
     // Restore state: llm_configs and active index
     {
@@ -279,16 +294,15 @@ pub async fn load_glossary(state: State<'_, AppState>) -> Result<String, String>
 }
 
 fn chrono_lite_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    let secs = duration.as_secs();
-    let hours = (secs / 3600) % 24;
-    let minutes = (secs / 60) % 60;
-    let seconds = secs % 60;
-    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+    chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
 fn get_export_dir() -> std::path::PathBuf {
+    if let Some(base) = std::env::var_os("MINDRUSH_DATA_DIR") {
+        let path = std::path::PathBuf::from(base).join("export");
+        let _ = std::fs::create_dir_all(&path);
+        return path;
+    }
     #[cfg(target_os = "windows")]
     {
         let base = std::env::var("APPDATA")
@@ -314,6 +328,11 @@ fn get_export_dir() -> std::path::PathBuf {
 }
 
 fn get_config_dir() -> std::path::PathBuf {
+    if let Some(base) = std::env::var_os("MINDRUSH_DATA_DIR") {
+        let path = std::path::PathBuf::from(base).join("config");
+        let _ = std::fs::create_dir_all(&path);
+        return path;
+    }
     #[cfg(target_os = "windows")]
     {
         let base = std::env::var("APPDATA")
@@ -335,5 +354,30 @@ fn get_config_dir() -> std::path::PathBuf {
             let _ = std::fs::create_dir_all(&config_dir);
         }
         config_dir
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ConfigFile;
+
+    #[test]
+    fn legacy_empty_config_recovers_a_valid_default_index() {
+        let mut config: ConfigFile = serde_json::from_str(r#"{"system_prompt":"translate","active_llm_index":99}"#).unwrap();
+        config.normalize();
+        assert_eq!(config.llm_configs.len(), 1);
+        assert_eq!(config.active_llm_index, 0);
+        assert!(config.llm_configs[0].config.api_key.is_empty());
+    }
+
+    #[test]
+    fn invalid_index_preserves_existing_profiles() {
+        let mut config: ConfigFile = serde_json::from_str(r#"{"system_prompt":"translate"}"#).unwrap();
+        config.normalize();
+        config.llm_configs[0].name = "Existing profile".into();
+        config.active_llm_index = 5;
+        config.normalize();
+        assert_eq!(config.active_llm_index, 0);
+        assert_eq!(config.llm_configs[0].name, "Existing profile");
     }
 }

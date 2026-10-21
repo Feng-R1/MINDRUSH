@@ -1,5 +1,6 @@
 // MindRush - Rust Translation App
 // Main entry point
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use mindrush::application::AppState;
 
@@ -8,7 +9,7 @@ fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::DEBUG.into())
+                .add_directive(tracing::Level::INFO.into())
                 .add_directive("pdf_oxide=warn".parse().unwrap()),
         )
         .init();
@@ -18,6 +19,7 @@ fn main() {
     // Run Tauri application
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|_app| {
             tracing::info!("MindRush setup complete");
             Ok(())
