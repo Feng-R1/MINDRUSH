@@ -57,7 +57,7 @@ jobs:
             throw "Release tag must look like v1.2.3: $env:RELEASE_TAG"
           }
           $version = $env:RELEASE_TAG.Substring(1)
-          $notes = "docs/release-$version.md"
+          $notes = "docs/release-$env:RELEASE_TAG.md"
           if (Test-Path $notes) {
             Copy-Item $notes .github/release-notes.md
           } else {
